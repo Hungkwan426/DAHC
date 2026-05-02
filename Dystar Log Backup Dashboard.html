@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dystar Log Backup Dashboard</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+}
+
+/* HEADER */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: rgba(30,41,59,0.7);
+    border-bottom: 1px solid #334155;
+    flex-wrap: wrap;
+}
+
+.title {
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.clock {
+    color: #38bdf8;
+    font-weight: bold;
+}
+
+/* CONTROLS */
+.controls {
+    padding: 15px;
+}
+
+.dropdown {
+    width: 100%;
+    max-width: 280px;
+    padding: 10px;
+    border-radius: 10px;
+    background: #1e293b;
+    color: white;
+    border: 1px solid #334155;
+}
+
+/* TABLE */
+.table-container {
+    overflow-x: auto;
+    padding: 10px;
+}
+
+table {
+    width: 100%;
+    min-width: 750px;
+    border-collapse: collapse;
+    background: #1e293b;
+}
+
+th, td {
+    padding: 10px;
+    border: 1px solid #334155;
+    text-align: center;
+    font-size: 13px;
+}
+
+th {
+    background: #334155;
+}
+
+.status-ok {
+    color: #22c55e;
+    font-weight: bold;
+}
+
+.status-na {
+    color: #f59e0b;
+}
+
+.small {
+    font-size: 12px;
+    opacity: 0.85;
+    display: block;
+    margin-top: 4px;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+
+    .clock {
+        align-self: flex-end;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <div class="title">Log Backup Schedule Dashboard</div>
+    <div class="clock" id="clock">--:--:--</div>
+</div>
+
+<div class="controls">
+    <select id="shift" class="dropdown" onchange="generateTable()">
+        <option value="AP">AP Shift (7AM - 3PM)</option>
+        <option value="EU">EU Shift (3PM - 11PM)</option>
+        <option value="NA">NA Shift (11PM - 6AM)</option>
+    </select>
+</div>
+
+<div class="table-container">
+<table>
+<thead>
+<tr>
+    <th>SID</th>
+    <th>Status</th>
+    <th>Last Good Log Backup</th>
+    <th>Issues / Comments</th>
+</tr>
+</thead>
+<tbody id="tableBody"></tbody>
+</table>
+</div>
+
+<script>
+
+/* ================= CLOCK ================= */
+function updateClock() {
+    document.getElementById("clock").innerText =
+        new Date().toLocaleTimeString('en-PH', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+        });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ================= DATA ================= */
+function base(hour) {
+    let d = new Date();
+    d.setHours(hour, 0, 0, 0);
+    return d;
+}
+
+const data = [
+    {sid:"ARD", freq:12, base:base(0)},
+    {sid:"SCD", freq:12, base:base(6)},
+    {sid:"BWT", freq:2, base:base(6)},
+    {sid:"D3D", freq:null},
+    {sid:"ERU", freq:12, base:base(6)},
+    {sid:"ERQ", freq:12, base:base(6)},
+    {sid:"ARQ", freq:12, base:base(0)},
+    {sid:"ARP", freq:2, base:base(6)},
+    {sid:"ERP", freq:2, base:base(6)},
+    {sid:"BWP", freq:2, base:base(6)},
+    {sid:"SCP", freq:2, base:base(6)},
+    {sid:"SMA", freq:2, base:base(6)}
+];
+
+/* ================= SHIFT ================= */
+function shiftRange(type) {
+    let now = new Date();
+    let s = new Date(now), e = new Date(now);
+
+    if (type === "AP") {
+        s.setHours(7,0,0,0);
+        e.setHours(15,0,0,0);
+    } else if (type === "EU") {
+        s.setHours(15,0,0,0);
+        e.setHours(23,0,0,0);
+    } else {
+        s.setHours(23,0,0,0);
+        e.setDate(e.getDate()+1);
+        e.setHours(6,0,0,0);
+    }
+
+    return {s,e};
+}
+
+/* ================= HELPERS ================= */
+function format(d) {
+    return d.toLocaleString('en-PH', {
+        year:'numeric',
+        month:'2-digit',
+        day:'2-digit',
+        hour:'2-digit',
+        minute:'2-digit'
+    });
+}
+
+function freqLabel(f) {
+    return f === 12 ? "Every 12 hours"
+         : f === 2  ? "Every 2 hours"
+         : "No log backup";
+}
+
+/* generate ALL runs up to shift end */
+function runs(base, freq, end) {
+    let r = [];
+    let c = new Date(base);
+
+    while (c <= end) {
+        r.push(new Date(c));
+        c.setHours(c.getHours() + freq);
+    }
+
+    return r;
+}
+
+/* ================= TABLE ================= */
+function generateTable() {
+
+    let shift = document.getElementById("shift").value;
+    let {s,e} = shiftRange(shift);
+    let tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+
+    data.forEach(d => {
+
+        let row = "<tr>";
+
+        if (!d.freq) {
+            row += `<td>${d.sid}</td>
+                    <td class="status-na">N/A</td>
+                    <td>No log backup</td>
+                    <td>No log backup required</td>`;
+        } else {
+
+            let r = runs(d.base, d.freq, e);
+            let last = r.length ? r[r.length - 1] : null;
+
+            let next = new Date(last);
+            next.setHours(next.getHours() + d.freq);
+
+            row += `
+                <td>${d.sid}</td>
+                <td class="status-ok">Completed</td>
+                <td>${format(last)}</td>
+                <td>
+                    Will run on ${format(next)}<br>
+                    <span class="small">${freqLabel(d.freq)}</span>
+                </td>
+            `;
+        }
+
+        row += "</tr>";
+        tbody.innerHTML += row;
+    });
+}
+
+/* INIT */
+generateTable();
+
+</script>
+
+</body>
+</html>

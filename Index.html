@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DXC Secure SOC Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    color: white;
+    overflow: hidden;
+    background: #050b1a;
+}
+
+/* 🌐 Animated SOC Grid */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(0,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.08) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridMove 18s linear infinite;
+    opacity: 0.2;
+    z-index: 0;
+}
+
+@keyframes gridMove {
+    from { transform: translate(0,0); }
+    to { transform: translate(-40px,-40px); }
+}
+
+/* 🌍 WORLD HEAT LAYER */
+#world {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    opacity: 0.6;
+}
+
+/* 🧊 GLASS PANEL */
+.glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 30px rgba(0, 170, 255, 0.25);
+    border-radius: 14px;
+}
+
+/* LOGIN */
+.login-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 360px;
+    padding: 25px;
+    text-align: center;
+    z-index: 3;
+}
+
+/* DASHBOARD */
+.dashboard {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 420px;
+    padding: 25px;
+    text-align: center;
+    z-index: 3;
+}
+
+input {
+    width: 90%;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+}
+
+button {
+    width: 95%;
+    padding: 10px;
+    margin-top: 10px;
+    background: #0088ff;
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+button:hover { background: #005fcc; }
+
+.hidden { display: none; }
+
+/* HEADER */
+.header {
+    font-size: 22px;
+    font-weight: bold;
+}
+
+/* ACTIVE SESSION */
+.active {
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #00ff99;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    background: red;
+    border-radius: 50%;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* CLOCK */
+.clock {
+    margin-top: 5px;
+    font-size: 14px;
+    color: #00d4ff;
+}
+
+/* LOGO */
+.logo {
+    width: 110px;
+    margin-bottom: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- 🌍 HEATMAP CANVAS -->
+<canvas id="world"></canvas>
+
+<!-- LOGIN -->
+<div id="loginBox" class="login-box glass">
+
+    <img class="logo" src="download.svg" alt="logo">
+
+    <h2>Secure Login</h2>
+
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+
+    <button onclick="login()">Login</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="dashboard glass hidden">
+
+    <div class="header">Welcome, DXC Admin</div>
+
+    <div class="active">
+        <div class="dot"></div>
+        Active Session
+    </div>
+
+    <div class="clock" id="clock"></div>
+
+    <div style="margin-top:20px;">
+        <button onclick="openBackup()">Azure Backup Dashboard</button>
+        <button onclick="openLog()">Azure Log Backup Dashboard</button>
+    </div>
+</div>
+
+<script>
+
+/* ================= LOGIN ================= */
+function login() {
+    const u = document.getElementById("username").value;
+    const p = document.getElementById("password").value;
+
+    if (u === "DXC" && p === "root") {
+        alert("Access Granted");
+        document.getElementById("loginBox").classList.add("hidden");
+        document.getElementById("dashboard").classList.remove("hidden");
+        startClock();
+    } else {
+        alert("Invalid Credentials");
+    }
+}
+
+/* ================= CLOCK ================= */
+function startClock() {
+    setInterval(() => {
+        document.getElementById("clock").innerText =
+        "PHT: " + new Date().toLocaleString("en-US", {
+            timeZone: "Asia/Manila",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true
+        });
+    }, 1000);
+}
+
+/* ================= BUTTONS ================= */
+function openBackup() {
+    window.open(
+        "file:///C:/Users/jpitapit/Downloads/Dystar%20Azure%20DB%20and%20Log%20Backup/Dystar%20Azure%20Backup%20Dashboard.html",
+        "_blank"
+    );
+}
+
+function openLog() {
+    window.open(
+        "file:///C:/Users/jpitapit/Downloads/Dystar%20Azure%20DB%20and%20Log%20Backup/Dystar%20Log%20Backup%20Dashboard.html",
+        "_blank"
+    );
+}
+
+/* ================= WORLD HEAT MAP ================= */
+const canvas = document.getElementById("world");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let nodes = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 3 + 2,
+    a: Math.random()
+}));
+
+function animate() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    for (let n of nodes) {
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(0, 200, 255, ${n.a})`;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#00d4ff";
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI*2);
+        ctx.fill();
+
+        n.a += (Math.random()-0.5)*0.03;
+        if (n.a < 0.2) n.a = 0.2;
+        if (n.a > 1) n.a = 1;
+
+        n.y -= 0.15;
+        if (n.y < 0) n.y = canvas.height;
+    }
+
+    requestAnimationFrame(animate);
+}
+
+animate();
+
+/* resize */
+window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+
+</script>
+
+</body>
+</html>
