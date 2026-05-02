@@ -5,40 +5,35 @@
 <title>Dystar Backup Dashboard</title>
 
 <style>
-body {
+html, body {
+    margin: 0;
+    padding: 0;
     font-family: Arial;
     background: #0f172a;
     color: #e2e8f0;
-    padding: 20px;
 }
 
-/* ⏰ DIGITAL CLOCK */
+/* ⏰ CLOCK (shifted slightly left) */
 #clock {
-    position: fixed;
-    top: 15px;
-    right: 20px;
+    position: absolute;
+
+    top: 30px;
+    right: 95px;   /* ⬅ moved left from 50px to 80px */
+
+    transform: translate(50%, -50%);
+
     background: #1e293b;
     padding: 8px 14px;
     border: 1px solid #334155;
     border-radius: 6px;
+
     font-size: 14px;
     font-weight: bold;
     color: #38bdf8;
     letter-spacing: 1px;
-    z-index: 9999;
-    min-width: 110px;
-    text-align: center;
-}
 
-/* Responsive scaling */
-@media (max-width: 600px) {
-    #clock {
-        top: 10px;
-        right: 10px;
-        font-size: 12px;
-        padding: 6px 10px;
-        min-width: 95px;
-    }
+    width: 120px;
+    text-align: center;
 }
 
 textarea {
@@ -48,6 +43,7 @@ textarea {
     color: #e2e8f0;
     border: 1px solid #334155;
     padding: 10px;
+    box-sizing: border-box;
 }
 
 button {
@@ -88,7 +84,6 @@ th {
 
 <body>
 
-<!-- ⏰ CLOCK ELEMENT -->
 <div id="clock">--:--:--</div>
 
 <h2>Dystar Azure Backup Dashboard</h2>
@@ -112,18 +107,14 @@ th {
 </table>
 
 <script>
-// ⏰ LIVE CLOCK FUNCTION
 function updateClock() {
     const now = new Date();
-    const time = now.toLocaleTimeString('en-US', {
-        hour12: false
-    });
-    document.getElementById("clock").innerText = time;
+    document.getElementById("clock").innerText =
+        now.toLocaleTimeString('en-US', { hour12: false });
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// 🔒 Fixed inventory
 const servers = [
 "dy5bcdabcd40","dy5epdaepd40","dy5w2dawwd40","dy5d3dad3d40","dy5w1dawwd40",
 "dy5ciard2200","dy5cieru2800","dy5cibwt2400","dy5ciscd2500","dy5ciarq2000",
@@ -133,14 +124,13 @@ const servers = [
 "dy5dcr02","dy5otdaotd40","dy5w1dawwp11","dy5w2dawwp11"
 ];
 
-// ⏱ SLA threshold
 const STALE_HOURS = 24;
 
 function processLogs() {
     const raw = document.getElementById("logs").value
         .split("\n")
         .map(l => l.trim())
-        .filter(l => l !== "");
+        .filter(Boolean);
 
     let records = [];
 
@@ -149,21 +139,19 @@ function processLogs() {
             let block = raw.slice(i, i + 6);
             if (block.length < 6) continue;
 
-            let status = block[1];
-            let server = block[2].toLowerCase();
-            let vault = block[3];
-            let date = block[4];
-
-            records.push({ server, status, vault, date });
+            records.push({
+                status: block[1],
+                server: block[2].toLowerCase(),
+                vault: block[3],
+                date: block[4]
+            });
         }
     }
 
     let map = {};
-
     records.forEach(r => {
-        let time = new Date(r.date);
-
-        if (!map[r.server] || new Date(map[r.server].date) < time) {
+        let t = new Date(r.date);
+        if (!map[r.server] || new Date(map[r.server].date) < t) {
             map[r.server] = r;
         }
     });
@@ -172,7 +160,6 @@ function processLogs() {
     tbody.innerHTML = "";
 
     let now = new Date();
-
     let stats = { ok:0, progress:0, stale:0, missing:0 };
 
     servers.forEach(s => {
@@ -186,18 +173,16 @@ function processLogs() {
             date = map[s].date;
             vault = map[s].vault;
 
-            let diffHrs = (now - new Date(date)) / (1000 * 60 * 60);
+            let diff = (now - new Date(date)) / (1000 * 60 * 60);
 
             if (status.toLowerCase().includes("progress")) {
                 cls = "progress";
                 stats.progress++;
-            }
-            else if (diffHrs > STALE_HOURS) {
+            } else if (diff > STALE_HOURS) {
                 cls = "stale";
                 status = "STALE";
                 stats.stale++;
-            }
-            else {
+            } else {
                 cls = "ok";
                 stats.ok++;
             }
@@ -214,12 +199,8 @@ function processLogs() {
         </tr>`;
     });
 
-    document.getElementById("summary").innerHTML = `
-        ✅ OK: ${stats.ok} |
-        🔄 In Progress: ${stats.progress} |
-        ⚠️ Stale (> ${STALE_HOURS}h): ${stats.stale} |
-        ❌ Missing: ${stats.missing}
-    `;
+    document.getElementById("summary").innerHTML =
+        `OK: ${stats.ok} | In Progress: ${stats.progress} | Stale: ${stats.stale} | Missing: ${stats.missing}`;
 }
 </script>
 
