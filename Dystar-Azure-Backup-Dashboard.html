@@ -199,8 +199,12 @@ function processLogs() {
         </tr>`;
     });
 
-    document.getElementById("summary").innerHTML =
-        `OK: ${stats.ok} | In Progress: ${stats.progress} | Stale: ${stats.stale} | Missing: ${stats.missing}`;
+    document.getElementById("summary").innerHTML = `
+        ✅ OK: ${stats.ok} |
+        🔄 In Progress: ${stats.progress} |
+        ⚠️ Stale (> ${STALE_HOURS}h): ${stats.stale} |
+        ❌ Missing: ${stats.missing}
+    `;
 }
 </script>
 
