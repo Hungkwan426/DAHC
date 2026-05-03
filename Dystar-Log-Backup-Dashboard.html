@@ -82,13 +82,6 @@ th {
     color: #f59e0b;
 }
 
-.small {
-    font-size: 12px;
-    opacity: 0.85;
-    display: block;
-    margin-top: 4px;
-}
-
 /* MOBILE */
 @media (max-width: 768px) {
     .header {
@@ -250,8 +243,7 @@ function generateTable() {
                 <td class="status-ok">Completed</td>
                 <td>${format(last)}</td>
                 <td>
-                    Will run on ${format(next)}<br>
-                    <span class="small">${freqLabel(d.freq)}</span>
+                    Will run on ${format(next)} (${freqLabel(d.freq)})
                 </td>
             `;
         }
