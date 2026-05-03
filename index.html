@@ -177,6 +177,7 @@ button:hover { background: #005fcc; }
     <div style="margin-top:20px;">
         <button onclick="openBackup()">Azure Backup Dashboard</button>
         <button onclick="openLog()">Azure Log Backup Dashboard</button>
+        <button onclick="openFS()">Dystar Azure FS Dashboard</button>
     </div>
 </div>
 
@@ -213,17 +214,15 @@ function startClock() {
 
 /* ================= BUTTONS ================= */
 function openBackup() {
-    window.open(
-        "Dystar-Azure-Backup-Dashboard.html",
-        "_blank"
-    );
+    window.open("Dystar-Azure-Backup-Dashboard.html", "_blank");
 }
 
 function openLog() {
-    window.open(
-        "Dystar-Log-Backup-Dashboard.html",
-        "_blank"
-    );
+    window.open("Dystar-Log-Backup-Dashboard.html", "_blank");
+}
+
+function openFS() {
+    window.open("Dystar-Azure-FS-Dashboard.html", "_blank");
 }
 
 /* ================= WORLD HEAT MAP ================= */
