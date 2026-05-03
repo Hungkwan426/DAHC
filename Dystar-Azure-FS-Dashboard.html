@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Dystar FS Report</title>
+
+<style>
+body {
+    font-family: Arial;
+    background:#0f172a;
+    color:#e2e8f0;
+    padding:20px;
+}
+
+/* CLOCK */
+#clock {
+    position: fixed;
+    top: 10px;
+    right: 20px;
+    background: #020617;
+    border: 1px solid #334155;
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #38bdf8;
+}
+
+/* INPUT */
+textarea {
+    width:100%;
+    height:260px;
+    background:#020617;
+    color:#38bdf8;
+    border:1px solid #334155;
+    padding:10px;
+}
+
+/* BUTTONS */
+button {
+    margin-top:10px;
+    padding:10px 14px;
+    border:none;
+    cursor:pointer;
+    color:white;
+}
+
+.gen { background:#22c55e; }
+.reset { background:#ef4444; }
+.long { background:#3b82f6; }
+.short { background:#8b5cf6; }
+.copy { background:#f59e0b; }
+
+/* TABLE */
+table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+    font-size:13px;
+}
+
+th,td {
+    border:1px solid #334155;
+    padding:6px;
+    text-align:center;
+}
+
+th { background:#1e293b; }
+
+.summaryBox {
+    margin-top:20px;
+    padding:15px;
+    background:#020617;
+    border:1px solid #334155;
+    line-height:1.5;
+}
+</style>
+</head>
+
+<body>
+
+<!-- CLOCK -->
+<div id="clock"></div>
+
+<h2>Dystar FS Report Dashboard</h2>
+
+<textarea id="input"></textarea>
+
+<br>
+
+<button class="gen" onclick="generate()">Generate Table</button>
+<button class="long" onclick="generateLongSummary()">Long Summary</button>
+<button class="short" onclick="generateShortSummary()">Short Summary</button>
+<button class="copy" onclick="copyTable()">Copy Table (Plain Text)</button>
+<button class="reset" onclick="resetAll()">Reset</button>
+
+<div id="output"></div>
+<div id="summary"></div>
+
+<script>
+
+let stats = {total:0, healthy:0, warning:0, critical:0};
+let lastTableRows = [];
+
+/* CLOCK */
+function updateClock(){
+    let now = new Date();
+    document.getElementById("clock").innerHTML =
+        now.toLocaleString();
+}
+setInterval(updateClock,1000);
+updateClock();
+
+/* FS LOGIC */
+function fsLogic(b){
+    if(/cifs/i.test(b)) return "Multiple CIFS mounts at 100%";
+    let s = b.match(/sapdata.*?(\d+)%/i);
+    if(s) return `sapdata FS at ${s[1]}%`;
+    return "None";
+}
+
+/* MEMORY */
+function memLogic(b){
+    let t = (b.match(/Mem:\s+(\d+)Gi/)||[])[1];
+    let u = (b.match(/Mem:\s+\d+Gi\s+([\d.]+)Gi/)||[])[1];
+    t = parseFloat(t||0);
+    u = parseFloat(u||0);
+    let p = t ? (u/t)*100 : 0;
+    return {pct:p, used:u, total:t};
+}
+
+/* SWAP */
+function swapLogic(b){
+    let t = (b.match(/Swap:\s+(\d+)Gi/)||[])[1];
+    let u = (b.match(/Swap:\s+\d+Gi\s+([\d.]+)/)||[])[1];
+    t = parseFloat(t||0);
+    u = parseFloat(u||0);
+    let p = t ? (u/t)*100 : 0;
+    return {pct:p, used:u, total:t};
+}
+
+/* CPU */
+function cpuLogic(b){
+    return parseFloat((b.match(/Utilization:\s*([\d.]+)%/)||[])[1]||0);
+}
+
+/* REMARKS */
+function remark(mem, swap, fs){
+    if(fs.includes("CIFS")) return "❌ Critical (FS Full)";
+    if(mem >= 95) return "❌ Critical (High Memory)";
+    if(mem >= 90 && swap >= 20) return "❌ Critical (High Mem + Swap)";
+    if(fs.includes("sapdata")) return "⚠️ Warning (FS Usage)";
+    if(mem >= 75) return "⚠️ Warning (High Memory)";
+    return "✅ Healthy";
+}
+
+/* GENERATE TABLE */
+function generate(){
+
+    let raw = document.getElementById("input").value;
+    let blocks = raw.split(/(?=Host:)/g).filter(x=>x.trim());
+
+    stats = {total:0, healthy:0, warning:0, critical:0};
+    lastTableRows = [];
+
+    let html = `
+    <table>
+    <tr>
+        <th>Azure Host Name</th>
+        <th>OS</th>
+        <th>Env</th>
+        <th>CPU</th>
+        <th>Memory</th>
+        <th>SWAP</th>
+        <th>FS</th>
+        <th>Remarks</th>
+    </tr>`;
+
+    blocks.forEach(b=>{
+
+        let host = (b.match(/Host:\s*(.*?)\./)||[])[1] || "";
+        let cpu = cpuLogic(b);
+        let mem = memLogic(b);
+        let swap = swapLogic(b);
+        let fs = fsLogic(b);
+
+        let r = remark(mem.pct, swap.pct, fs);
+
+        stats.total++;
+        if(r.includes("Critical")) stats.critical++;
+        else if(r.includes("Warning")) stats.warning++;
+        else stats.healthy++;
+
+        let row = [
+            host,
+            "Linux",
+            "Production",
+            cpu.toFixed(2)+"%",
+            `${mem.pct.toFixed(1)}% (${mem.used}/${mem.total} GiB)`,
+            `${swap.pct.toFixed(1)}% (${swap.used}/${swap.total} GiB)`,
+            fs,
+            r
+        ];
+
+        lastTableRows.push(row);
+
+        html += "<tr>"+row.map(c=>`<td>${c}</td>`).join("")+"</tr>";
+    });
+
+    html += "</table>";
+
+    document.getElementById("output").innerHTML = html;
+    document.getElementById("summary").innerHTML = "";
+}
+
+/* LONG SUMMARY (PARAGRAPH) */
+function generateLongSummary(){
+
+    let text =
+    `The Linux server health report analyzed ${stats.total} servers across production environments. ` +
+    `Out of these, ${stats.healthy} servers are operating within healthy thresholds, ` +
+    `${stats.warning} servers are in a warning state due to elevated memory utilization or file system usage, ` +
+    `and ${stats.critical} servers are in a critical state requiring immediate attention. ` +
+    `Critical conditions are primarily driven by full CIFS file system mounts, excessive memory consumption, ` +
+    `and high combined memory and swap usage. Warning states indicate early saturation of system resources ` +
+    `that may impact performance if not addressed promptly. Overall system stability is dependent on resolving ` +
+    `file system capacity issues and monitoring memory pressure trends across affected hosts.`;
+
+    document.getElementById("summary").innerHTML =
+    `<div class="summaryBox">${text}</div>`;
+}
+
+/* SHORT SUMMARY */
+function generateShortSummary(){
+
+    let text =
+    `Summary: ${stats.total} servers analyzed — ` +
+    `${stats.critical} critical, ${stats.warning} warning, ${stats.healthy} healthy. ` +
+    `Main issues: CIFS full, high memory usage, and elevated swap activity.`;
+
+    document.getElementById("summary").innerHTML =
+    `<div class="summaryBox">${text}</div>`;
+}
+
+/* COPY TABLE AS PLAIN TEXT */
+function copyTable(){
+
+    if(lastTableRows.length === 0){
+        alert("Generate table first.");
+        return;
+    }
+
+    let text =
+`Azure Host Name\tOS\tEnv\tCPU\tMemory\tSWAP\tFS\tRemarks\n`;
+
+    lastTableRows.forEach(r=>{
+        text += r.join("\t") + "\n";
+    });
+
+    navigator.clipboard.writeText(text).then(()=>{
+        alert("Table copied as plain text.");
+    });
+}
+
+/* RESET */
+function resetAll(){
+    document.getElementById("input").value = "";
+    document.getElementById("output").innerHTML = "";
+    document.getElementById("summary").innerHTML = "";
+    stats = {total:0, healthy:0, warning:0, critical:0};
+    lastTableRows = [];
+}
+
+</script>
+
+</body>
+</html>
